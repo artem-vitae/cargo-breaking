@@ -20,8 +20,8 @@ name = "cargo-breaking"
 [dependencies]
 syn = { version = "1.0", features = ["full", "extra-traits", "visit"] }
 anyhow = "1.0"
-git2 = "0.13"
-cargo_toml = "0.9"
+git2 = { version = "0.13", features = ["vendored-openssl"] }
+cargo_toml = "0.11"
 semver = "1.0"
 clap = "2.33"
 tap = "1.0"

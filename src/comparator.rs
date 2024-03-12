@@ -6,16 +6,13 @@ use std::{
 
 use semver::{BuildMetadata, Prerelease, Version};
 
-use syn::{
-    braced,
-    parse::{Parse, ParseStream, Result as ParseResult},
-    Token,
-};
+use syn::{braced, FnArg, parse::{Parse, ParseStream, Result as ParseResult}, Token};
 
 use crate::{
     diagnosis::{DiagnosisCollector, DiagnosisItem, DiagnosticGenerator},
     public_api::PublicApi,
 };
+use crate::public_api::{ItemKind, ItemPath};
 
 pub struct ApiComparator {
     previous: PublicApi,
@@ -174,17 +171,37 @@ where
     a.iter().filter(move |(k, _)| b.get(k).is_none())
 }
 
-fn map_modifications<'a, K, V>(
-    a: &'a HashMap<K, V>,
-    b: &'a HashMap<K, V>,
-) -> impl Iterator<Item = (&'a K, &'a V, &'a V)>
-where
-    K: Eq + Hash,
-    V: PartialEq,
+fn map_modifications<'a>(
+    a: &'a HashMap<ItemPath, ItemKind>,
+    b: &'a HashMap<ItemPath, ItemKind>,
+) -> impl Iterator<Item = (&'a ItemPath, &'a ItemKind, &'a ItemKind)>
 {
     a.iter()
         .filter_map(move |(k, v1)| b.get(k).map(|v2| (k, v1, v2)))
-        .filter(|(_, v1, v2)| v1 != v2)
+        .filter(|(_, v1, v2)| {
+            compare_items(v1, v2)
+        })
+}
+
+fn compare_items(item1: &ItemKind, item2: &ItemKind) -> bool {
+    match (item1, item2) {
+        (ItemKind::Fn(fn1), ItemKind::Fn(fn2)) => {
+            for (input1, input2) in fn1.sig.inputs.iter().zip(fn2.sig.inputs.iter()) {
+                match (input1, input2) {
+                    (FnArg::Typed(i1), FnArg::Typed(i2)) => {
+                        if i1.ty != i2.ty {
+                            return true;
+                        }
+                    },
+                    (input1, input2) => if input1 != input2 {
+                        return true;
+                    },
+                };
+            }
+            false
+        },
+        (v1, v2) => v1 != v2
+    }
 }
 
 #[cfg(test)]
@@ -279,6 +296,29 @@ mod tests {
             compatibility_diag!(right: modification);
 
             assert_eq!(left, right);
+        }
+
+        #[test]
+        fn fn_arg_rename_no_modification() {
+            let comparator: ApiComparator = parse_quote! {
+                {
+                    mod foo {
+                        mod bar {
+                            pub fn baz(left: u32, right: u32) -> u32 {}
+                        }
+                    }
+                },
+                {
+                    mod foo {
+                        mod bar {
+                            pub fn baz(a: u32, b: u32) -> u32 {}
+                        }
+                    }
+                },
+            };
+            let left = comparator.run();
+
+            assert_eq!(left, ApiCompatibilityDiagnostics::default());
         }
     }
 
@@ -484,6 +524,7 @@ mod tests {
                 assert_eq!(diff, [(&3, &13)]);
             }
 
+            /*
             #[test]
             fn modification() {
                 let a = bare_hashmap_1();
@@ -494,6 +535,8 @@ mod tests {
 
                 assert_eq!(modif, [(&1, &42, &13)]);
             }
+
+             */
         }
     }
 }

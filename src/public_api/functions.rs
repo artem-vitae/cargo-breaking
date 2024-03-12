@@ -65,7 +65,7 @@ impl<'ast> Visit<'ast> for FnVisitor {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FnPrototype {
-    sig: Signature,
+    pub(crate) sig: Signature,
 }
 
 impl FnPrototype {

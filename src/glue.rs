@@ -17,7 +17,6 @@ pub(crate) fn extract_api() -> AnyResult<PublicApi> {
         .arg("--lib")
         .arg("--")
         .args(&["-Z", "unpretty=expanded"])
-        .args(&["-Z", "unpretty=everybody_loops"])
         .arg("--emit=mir")
         .output()
         .context("Failed to run `cargo rustc`")?;
